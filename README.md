@@ -1,6 +1,6 @@
 # Real-Time-Chat-Application
 
-A well-crafted README file is essential for your project's success, as it provides information about the project, how to set it up, and how to use it. Here’s a template you can use for your chat application project:
+
 
 ---
 
@@ -94,4 +94,3 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ---
 
-Feel free to adjust the sections according to your project's specifics. If your project has additional features, setup steps, or requirements, make sure to include those as well.
