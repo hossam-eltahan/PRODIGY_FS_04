@@ -1,14 +1,23 @@
 <?php
-require 'vendor/autoload.php';
+require __DIR__ . '/vendor/autoload.php';
+require 'config/config.php'; // Include your database connection
 
 use Ratchet\MessageComponentInterface;
 use Ratchet\ConnectionInterface;
+use Ratchet\Http\HttpServer;
+use Ratchet\WebSocket\WsServer;
+use Ratchet\Server\IoServer;
 
 class Chat implements MessageComponentInterface {
     protected $clients;
+    protected $users;
+    protected $pdo;
 
     public function __construct() {
         $this->clients = new \SplObjectStorage;
+        $this->users = [];
+        global $pdo;
+        $this->pdo = $pdo;
     }
 
     public function onOpen(ConnectionInterface $conn) {
@@ -17,11 +26,29 @@ class Chat implements MessageComponentInterface {
     }
 
     public function onMessage(ConnectionInterface $from, $msg) {
-        foreach ($this->clients as $client) {
-            if ($from !== $client) {
-                $client->send($msg);
-            }
+        $data = json_decode($msg, true);
+
+        // Handle new user connections
+        if (isset($data['user'])) {
+            $this->users[$data['user']] = $from;
+            return;
         }
+
+        $message = htmlspecialchars($data['message']);
+        $fromUser = htmlspecialchars($data['from']);
+        $toUser = htmlspecialchars($data['to']);
+
+        // Save the message to the database
+        $stmt = $this->pdo->prepare("INSERT INTO messages (sender, receiver, message) VALUES (?, ?, ?)");
+        $stmt->execute([$fromUser, $toUser, $message]);
+
+        if (isset($this->users[$toUser])) {
+            $toClient = $this->users[$toUser];
+            $toClient->send(json_encode(['message' => $message, 'from' => $fromUser, 'to' => $toUser]));
+        }
+
+        // Send the message to the sender to update their own chat window
+        $from->send(json_encode(['message' => $message, 'from' => $fromUser, 'to' => $toUser]));
     }
 
     public function onClose(ConnectionInterface $conn) {
@@ -34,10 +61,6 @@ class Chat implements MessageComponentInterface {
         $conn->close();
     }
 }
-
-use Ratchet\Server\IoServer;
-use Ratchet\Http\HttpServer;
-use Ratchet\WebSocket\WsServer;
 
 $server = IoServer::factory(
     new HttpServer(
